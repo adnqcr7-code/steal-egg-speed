@@ -1,34 +1,41 @@
--- Steal an Egg | Speed Bypass | by [YourName]
--- Works on Xeno, Delta, Krnl, Fluxus
+-- Steal an Egg | Speed Bypass | by adnqcr7-code
+-- Based on l10scripts method | Works on Xeno, Delta, Krnl
 
-local SPEED = 100 -- change this
-local enabled = false
+local SPEED = 500
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
-local Player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
 
 -- Check executor
-local missing = {}
-if type(getgc) ~= "function" then table.insert(missing, "getgc") end
-if type(hookfunction) ~= "function" then table.insert(missing, "hookfunction") end
-if type(islclosure) ~= "function" then table.insert(missing, "islclosure") end
-if #missing > 0 then
-    warn("[Speed] Missing: " .. table.concat(missing, ", "))
+if not getgc then
+    warn("[Speed] Missing getgc - executor too weak")
+    return
+end
+if not hookfunction then
+    warn("[Speed] Missing hookfunction - executor too weak")
+    return
+end
+if not islclosure then
+    warn("[Speed] Missing islclosure - executor too weak")
     return
 end
 
--- Find the anticheat function in GC
-local function findACFunc()
+-- Find the anticheat function (l10scripts method)
+local function findfunction(nups, linedefined)
     for _, f in next, getgc() do
-        if typeof(f) == "function" and islclosure(f) then
+        if typeof(f) == 'function' and islclosure(f) then
             local upvs = debug.getupvalues(f)
             local line = debug.info(f, "l")
-            if upvs and #upvs == 19 and line == 3 then
-                local v7 = debug.getupvalue(f, 2)
-                if v7 then
-                    return v7
+            if upvs and #upvs == nups and line == linedefined then
+                if nups == 10 then
+                    local t = debug.getupvalue(f, 3)
+                    if typeof(t) == "table" and rawget(t, "Humanoid") then
+                        return f
+                    end
+                else
+                    return f
                 end
             end
         end
@@ -36,53 +43,58 @@ local function findACFunc()
     return nil
 end
 
-local target = findACFunc()
-if target then
-    local hooked
-    hooked = hookfunction(target, newlclosure(function(p1, p2)
-        if p2 and typeof(p2) == "table" then
-            setmetatable(p2, {}) -- strip anticheat metatable
-        end
-        return hooked(p1, p2)
-    end))
-    print("[Speed] Anticheat bypassed")
-else
-    warn("[Speed] Could not find anticheat function - speed may be reset")
+local func3 = findfunction(19, 3)
+if not func3 then
+    warn("[Speed] Failed to find anticheat function (19 upvalues, line 3)")
+    return
 end
 
+local v7 = debug.getupvalue(func3, 2)
+if not v7 then
+    warn("[Speed] Failed to get v7 upvalue")
+    return
+end
+
+local hookedfunc3
+hookedfunc3 = hookfunction(v7, newlclosure(function(p1, p2)
+    if p2 and typeof(p2) == "table" then
+        setmetatable(p2, {})
+    end
+    return hookedfunc3(p1, p2)
+end))
+
+print("[Speed] Anticheat bypassed. Applying speed...")
+
+-- Apply speed
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChild("Humanoid")
+    if not hum then return end
+    hum.WalkSpeed = SPEED
+end)
+
 -- UI
-task.wait(2)
-local pg = Player:WaitForChild("PlayerGui", 10)
-if not pg then pg = Instance.new("PlayerGui", Player) end
+task.wait(1)
+local pg = LocalPlayer:WaitForChild("PlayerGui", 10)
+if not pg then pg = Instance.new("PlayerGui", LocalPlayer) end
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(180, 70)
+frame.Size = UDim2.fromOffset(180, 50)
 frame.Position = UDim2.new(0, 20, 0, 80)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 frame.BorderSizePixel = 0
 frame.Parent = pg
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 24)
-title.BackgroundTransparency = 1
-title.Text = "Speed: OFF"
-title.TextColor3 = Color3.fromRGB(255, 80, 80)
-title.TextSize = 14
-title.Font = Enum.Font.GothamBold
-title.Parent = frame
-
-local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(1, -16, 0, 24)
-btn.Position = UDim2.new(0, 8, 0, 38)
-btn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-btn.Text = "Toggle (F)"
-btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-btn.TextSize = 13
-btn.Font = Enum.Font.GothamBold
-btn.BorderSizePixel = 0
-btn.Parent = frame
-Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 1, 0)
+label.BackgroundTransparency = 1
+label.Text = "Speed: ON (" .. SPEED .. ")"
+label.TextColor3 = Color3.fromRGB(80, 255, 80)
+label.TextSize = 14
+label.Font = Enum.Font.GothamBold
+label.Parent = frame
 
 -- Draggable
 local dragging, dragStart, frameStart
@@ -94,7 +106,9 @@ frame.InputBegan:Connect(function(input)
     end
 end)
 frame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
 end)
 UIS.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
@@ -105,36 +119,4 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
--- Speed
-RunService.Heartbeat:Connect(function()
-    if enabled then
-        local char = Player.Character
-        local hum = char and char:FindFirstChild("Humanoid")
-        if hum and hum.WalkSpeed < SPEED then
-            hum.WalkSpeed = SPEED
-        end
-    end
-end)
-
-local function toggle()
-    enabled = not enabled
-    if enabled then
-        title.Text = "Speed: ON (" .. SPEED .. ")"
-        title.TextColor3 = Color3.fromRGB(80, 255, 80)
-        btn.BackgroundColor3 = Color3.fromRGB(40, 120, 40)
-    else
-        title.Text = "Speed: OFF"
-        title.TextColor3 = Color3.fromRGB(255, 80, 80)
-        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-        local char = Player.Character
-        local hum = char and char:FindFirstChild("Humanoid")
-        if hum then hum.WalkSpeed = 16 end
-    end
-end
-
-btn.MouseButton1Click:Connect(toggle)
-UIS.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == Enum.KeyCode.F then toggle() end
-end)
-
-print("[Speed] Loaded. Press F to toggle.")   
+print("[Speed] Done. Speed " .. SPEED .. " applied.")   
